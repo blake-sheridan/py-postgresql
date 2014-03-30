@@ -9,6 +9,9 @@ setup(
     ext_modules = [
         Extension(
             name = 'postgresql',
+            depends = [
+                'include/postgresql/type.hpp',
+            ],
             include_dirs = [
                 '/usr/include/postgresql',
                 'include',

@@ -82,6 +82,44 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(result[5][0], 7)
         self.assertIs(   result[5][1], True)
 
+    def test_encode_text(self):
+        db = Database(name=NAME)
+        db('CREATE TABLE encode_text ('
+           ' x TEXT'
+           ');')
+
+        STRINGS = ('abc', '123')
+
+        for string in STRINGS:
+            db('INSERT INTO encode_text VALUES ($1)', string)
+
+        result = db('SELECT * FROM encode_text')
+
+        self.assertEqual(len(result), len(STRINGS))
+
+        for row in result:
+            self.assertIn(row[0], STRINGS)
+
+    @unittest.expectedFailure
+    def test_encode_integer(self):
+        db = Database(name=NAME)
+        db('CREATE TABLE encode_integer ('
+           ' x INTEGER'
+           ');')
+
+        for x in (1, 0, -1):
+            db('INSERT INTO encode_integer VALUES ($1)', x)
+            result = db('SELECT * FROM encode_integer')
+
+            self.assertEqual(len(result), 1)
+
+            y = result[0][0]
+
+            self.assertIsInstance(y, int)
+            self.assertEqual(x, y)
+
+            db('DELETE FROM encode_integer')
+
     @unittest.expectedFailure
     def test_row_equal(self):
         db = Database(name=NAME)

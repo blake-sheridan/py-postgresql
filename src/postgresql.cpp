@@ -4,9 +4,7 @@
 #include "b/Identifier.hpp"
 #include "b/python.h"
 #include "b/type.hpp"
-#include "postgresql/decode.hpp"
-
-using namespace b;
+#include "postgresql/type.hpp"
 
 typedef struct {
     PyObject_HEAD
@@ -132,7 +130,7 @@ ConnectionError_type = {
 static void
 ConnectionError_set(PGconn *pg_conn)
 {
-    if (!type::ensure_ready(&ConnectionError_type)) {
+    if (!b::type::ensure_ready(&ConnectionError_type)) {
         PyErr_SetString(PyExc_SystemError, "Failed to ready ConnectionError");
         return;
     }
@@ -226,7 +224,7 @@ ExecutionError_type = {
 static void
 ExecutionError_set(PGresult *pg_result)
 {
-    if (!type::ensure_ready(&ExecutionError_type)) {
+    if (!b::type::ensure_ready(&ExecutionError_type)) {
         PyErr_SetString(PyExc_SystemError, "Failed to ready ExecutionError");
         return;
     }
@@ -342,7 +340,7 @@ Row___len__(Row *self)
 static PyObject *
 Row___getitem__(Row *self, Py_ssize_t index)
 {
-    return postgresql::decode::decode(self->result->pg_result, self->index, index);
+    return postgresql::type::decode(self->result->pg_result, self->index, index);
 }
 
 static PyObject *
@@ -381,7 +379,7 @@ Row___hash__(Row *self)
 static RowIterator *
 Row___iter__(Row *self)
 {
-    if (!type::ensure_ready(&RowIterator_type))
+    if (!b::type::ensure_ready(&RowIterator_type))
         return NULL;
 
     RowIterator *iterator = (RowIterator *)RowIterator_type.tp_alloc(&RowIterator_type, 0);
@@ -581,7 +579,7 @@ Result_row(Result *self, int i)
 {
     assert(i < self->row_count);
 
-    if (!type::ensure_ready(&Row_type))
+    if (!b::type::ensure_ready(&Row_type))
         return NULL;
 
     Row *row = (Row *)Row_type.tp_alloc(&Row_type, 0);
@@ -613,7 +611,7 @@ Result___getitem__(Result *self, Py_ssize_t i)
 static ResultIterator *
 Result___iter__(Result *self)
 {
-    if (!type::ensure_ready(&ResultIterator_type))
+    if (!b::type::ensure_ready(&ResultIterator_type))
         return NULL;
 
     ResultIterator *iterator = (ResultIterator *)ResultIterator_type.tp_alloc(&ResultIterator_type, 0);
@@ -701,7 +699,7 @@ Result_new(PGresult *pg_result)
         return NULL;
     }
 
-    if (!type::ensure_ready(&Result_type))
+    if (!b::type::ensure_ready(&Result_type))
         return NULL;
 
     Result *self = (Result *)Result_type.tp_alloc(&Result_type, 0);
@@ -855,12 +853,12 @@ Database___doc__,
 static int
 Database___init__(Database *self, PyObject *args, PyDictObject *kwargs)
 {
-    static Identifier id_dbname("dbname");
-    static Identifier id_host("host");
-    static Identifier id_name("name");
-    static Identifier id_password("password");
-    static Identifier id_port("port");
-    static Identifier id_user("user");
+    static b::Identifier id_dbname("dbname");
+    static b::Identifier id_host("host");
+    static b::Identifier id_name("name");
+    static b::Identifier id_password("password");
+    static b::Identifier id_port("port");
+    static b::Identifier id_user("user");
 
     char  *keywords[6];
     char  *values  [6];
@@ -982,7 +980,7 @@ Database_ExecutionError(Database *self)
 {
     PyTypeObject *cls = &ExecutionError_type;
 
-    if (!type::ensure_ready(cls))
+    if (!b::type::ensure_ready(cls))
         return NULL;
 
     Py_INCREF(cls);
@@ -1068,7 +1066,7 @@ Database_schema(Database *self, PyObject *name)
     TODO();
     return NULL;
 
-    if (!type::ensure_ready(&Schema_type))
+    if (!b::type::ensure_ready(&Schema_type))
         return NULL;
 
     Schema *schema = (Schema *)Schema_type.tp_alloc(&Schema_type, 0);
@@ -1089,7 +1087,7 @@ Database_transaction___doc__,
 static Transaction *
 Database_transaction(Database *self)
 {
-    if (!type::ensure_ready(&Transaction_type))
+    if (!b::type::ensure_ready(&Transaction_type))
         return NULL;
 
     Transaction *transaction = (Transaction *)Transaction_type.tp_alloc(&Transaction_type, 0);
@@ -1110,64 +1108,86 @@ Database_methods[] = {
     {NULL}
 };
 
-static Result *
-Database___call__(Database *self, PyObject *args, PyObject *kwargs)
+static inline char *
+encoded_command(PyObject *command)
 {
-    Py_ssize_t n = PyTuple_GET_SIZE(args);
-    if (n == 0) {
-        PyErr_SetString(PyExc_TypeError, "expecting at least 1 positional argument");
+    if (!PyUnicode_Check(command)) {
+        PyErr_Format(PyExc_TypeError, "command must be a string, got: %R", command);
         return NULL;
     }
 
+    if (PyUnicode_READY(command) == -1)
+        return NULL;
+
+    if (PyUnicode_IS_COMPACT_ASCII(command)) {
+        // Inline fast path for ASCII strings
+        return (char *)((PyASCIIObject *)command + 1);
+    }
+
+    TODO();
+    return NULL;
+}
+
+static inline Result *
+_Database_execute_0(Database *self, PyObject *command_object)
+{
+    char *command = encoded_command(command_object);
+    if (command == NULL)
+        return NULL;
+
+    return Result_new(
+        PQexecParams(self->pg_conn, command, 0, NULL, NULL, NULL, NULL, 1)
+        );
+}
+
+static inline Result *
+_Database_execute_1(Database *self, PyObject *command_object, PyObject *parameter)
+{
+    char *command = encoded_command(command_object);
+    if (command == NULL)
+        return NULL;
+
+    Oid   types[1];
+    char *values[1];
+    int   lengths[1];
+    int   formats[1];
+
+    if (!postgresql::type::encode(parameter, types, values, lengths, formats))
+        return NULL;
+
+    return Result_new(
+        PQexecParams(self->pg_conn, command, 1, types, values, lengths, formats, 1)
+        );
+}
+
+static inline Result *
+_Database_execute_n(Database *self, PyObject *args, size_t arity)
+{
+    TODO();
+    return NULL;
+//    return PQexecParams(self->pg_conn, command_bytes, 1, NULL, NULL, NULL, NULL, 1);
+}
+
+static Result *
+Database___call__(Database *self, PyObject *args, PyObject *kwargs)
+{
     if (kwargs != NULL) {
         PyErr_SetString(PyExc_TypeError, "__call__ does not take keyword arguments");
         return NULL;
     }
 
-    PyObject *command_string = PyTuple_GET_ITEM(args, 0);
-    if (!PyUnicode_Check(command_string)) {
-        PyErr_Format(PyExc_TypeError, "argument 1 must be a string, got: %R", command_string);
-        return NULL;
+    Py_ssize_t n = PyTuple_GET_SIZE(args);
+    switch (n) {
+      case 0:
+          PyErr_SetString(PyExc_TypeError, "expecting at least 1 positional argument");
+          return NULL;
+      case 1:
+          return _Database_execute_0(self, PyTuple_GET_ITEM(args, 0));
+      case 2:
+          return _Database_execute_1(self, PyTuple_GET_ITEM(args, 0), PyTuple_GET_ITEM(args, 1));
+      default:
+          return _Database_execute_n(self, args, n - 1);
     }
-
-    if (PyUnicode_READY(command_string) == -1)
-        return NULL;
-
-    char *command;
-    if (PyUnicode_IS_COMPACT_ASCII(command_string)) {
-        // Inline fast path for ASCII strings
-        command = (char *)((PyASCIIObject *)command_string + 1);
-    } else {
-        TODO();
-        return NULL;
-    }
-
-    int  *parameter_formats;
-    int  *parameter_lengths;
-    Oid  *parameter_types;
-    char *parameter_values;
-
-    if (n == 1) {
-        parameter_formats = NULL;
-        parameter_lengths = NULL;
-        parameter_types = NULL;
-        parameter_values = NULL;
-    } else {
-        TODO();
-        return NULL;
-    }
-
-    return Result_new(
-        PQexecParams(
-            self->pg_conn,
-            command,
-            n - 1,
-            parameter_types,
-            (const char * const *)parameter_values,
-            parameter_lengths,
-            parameter_formats,
-            1)
-        );
 }
 
 /* Database_type */
@@ -1232,8 +1252,8 @@ module_definition = {
 PyMODINIT_FUNC
 PyInit_postgresql(void)
 {
-    if (!type::ensure_ready(&Database_type) ||
-        !type::ensure_ready(&ConnectionError_type))
+    if (!b::type::ensure_ready(&Database_type) ||
+        !b::type::ensure_ready(&ConnectionError_type))
         return NULL;
 
     PyObject *module = PyModule_Create(&module_definition);

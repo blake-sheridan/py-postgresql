@@ -1,10 +1,10 @@
 #include "Python.h"
-#include <netinet/in.h> // htonl
 #include "libpq-fe.h"
 
 #include "b/Identifier.hpp"
 #include "b/python.h"
 #include "b/type.hpp"
+#include "postgresql/decode.hpp"
 
 using namespace b;
 
@@ -66,123 +66,6 @@ typedef struct {
 
 static inline Row *Result_row(Result *, int);
 static inline bool Row_check(PyObject *);
-
-/* */
-
-static inline PyObject *
-_bool(PGresult *r, int i, int j)
-{
-    if (*PQgetvalue(r, i, j))
-        Py_RETURN_TRUE;
-    else
-        Py_RETURN_FALSE;
-}
-
-static inline PyObject *
-_float4(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-_float4_array(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-_int4(PGresult *r, int i, int j)
-{
-    char   *bytes      = PQgetvalue(r, i, j);
-    int32_t host_value = *(int32_t *)bytes;
-    int32_t value      = htonl(host_value);
-
-    return PyLong_FromLong(value);
-}
-
-static inline PyObject *
-_int4_array(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-_text(PGresult *r, int i, int j)
-{
-    int   length = PQgetlength(r, i, j);
-    char *value  = PQgetvalue (r, i, j);
-
-    return PyUnicode_FromStringAndSize(value, length);
-}
-
-static inline PyObject *
-_text_array(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-_date(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-_time(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-_timestamp(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-_timestamptz(PGresult *r, int i, int j)
-{
-    TODO();
-    return NULL;
-}
-
-static inline PyObject *
-cell(PGresult *r, int i, int j)
-{
-    switch (PQftype(r, j)) {
-      case 16:   return         _bool(r, i, j);
-          // case 17:   return        _bytea(r, i, j);
-          // case 18:   return         _char(r, i, j);
-          // case 20:   return         _int8(r, i, j);
-          // case 21:   return         _int2(r, i, j);
-      case 23:   return         _int4(r, i, j);
-      case 25:   return         _text(r, i, j);
-      case 700:  return       _float4(r, i, j);
-          // case 700:  return       _float8(r, i, j);
-      case 1007: return   _int4_array(r, i, j);
-      case 1009: return   _text_array(r, i, j);
-      case 1021: return _float4_array(r, i, j);
-      case 1082: return         _date(r, i, j);
-      case 1083: return         _time(r, i, j);
-      case 1114: return    _timestamp(r, i, j);
-      case 1184: return  _timestamptz(r, i, j);
-          // case 1186: return     _interval(r, i, j);
-          // case 1266: return       _timetz(r, i, j);
-          // case 2249: return       _record(r, i, j);
-          // case 2950: return         _uuid(r, i, j);
-      default:
-          PyErr_Format(PyExc_NotImplementedError, "%zd", PQftype(r, j));
-          return NULL;
-    }
-}
-
 
 /* ConnectionError */
 
@@ -459,7 +342,7 @@ Row___len__(Row *self)
 static PyObject *
 Row___getitem__(Row *self, Py_ssize_t index)
 {
-    return cell(self->result->pg_result, self->index, index);
+    return postgresql::decode::decode(self->result->pg_result, self->index, index);
 }
 
 static PyObject *

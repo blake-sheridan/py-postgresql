@@ -1153,18 +1153,6 @@ Database___del__(Database *self)
 /* Database_getset */
 
 static PyTypeObject *
-Database_ConnectionError(Database *self)
-{
-    PyTypeObject *cls = &ConnectionError_type;
-
-    if (!type::ensure_ready(cls))
-        return NULL;
-
-    Py_INCREF(cls);
-    return cls;
-}
-
-static PyTypeObject *
 Database_ExecutionError(Database *self)
 {
     PyTypeObject *cls = &ExecutionError_type;
@@ -1231,7 +1219,6 @@ Database_user(Database *self)
 
 static PyGetSetDef
 Database_getset[] = {
-    {(char *)"ConnectionError", (getter)Database_ConnectionError, NULL, NULL},
     {(char *)"ExecutionError",  (getter)Database_ExecutionError,  NULL, NULL},
     {(char *)"host",            (getter)Database_host,            NULL, Database_host___doc__},
     {(char *)"name",            (getter)Database_name,            NULL, Database_name___doc__},
@@ -1420,14 +1407,16 @@ module_definition = {
 PyMODINIT_FUNC
 PyInit_postgresql(void)
 {
-    if (!type::ensure_ready(&Database_type))
+    if (!type::ensure_ready(&Database_type) ||
+        !type::ensure_ready(&ConnectionError_type))
         return NULL;
 
     PyObject *module = PyModule_Create(&module_definition);
     if (module == NULL)
         return NULL;
 
-    PyModule_AddObject(module, "Database", (PyObject *)&Database_type);
+    PyModule_AddObject(module, "ConnectionError", (PyObject *)&ConnectionError_type);
+    PyModule_AddObject(module, "Database",        (PyObject *)&Database_type);
 
     return module;
 };

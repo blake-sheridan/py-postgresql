@@ -846,37 +846,6 @@ Schema_type = {
     /* tp_free            */ 0,
 };
 
-/* Helpers */
-
-static char *
-encode(PyUnicodeObject *string)
-{
-    PyObject *bytes = PyUnicode_EncodeLocale((PyObject *)string, NULL);
-    if (bytes == NULL)
-        return NULL;
-
-    assert(PyBytes_Check(bytes));
-
-    char *retval = (char *)PyMem_MALLOC(PyBytes_GET_SIZE(bytes));
-    if (retval == NULL) {
-        Py_DECREF(bytes);
-        return NULL;
-    }
-
-    memcpy(retval, PyBytes_AS_STRING(bytes), PyBytes_GET_SIZE(bytes) + 1);
-
-    Py_DECREF(bytes);
-
-    return retval;
-}
-
-static char *
-encode(PyLongObject *integer)
-{
-    TODO();
-    return NULL;
-}
-
 /* Database */
 
 PyDoc_STRVAR(
@@ -893,14 +862,6 @@ Database___init__(Database *self, PyObject *args, PyDictObject *kwargs)
     static Identifier id_port("port");
     static Identifier id_user("user");
 
-    int retval = -1;
-
-    char *host     = NULL;
-    char *name     = NULL;
-    char *password = NULL;
-    char *port     = NULL;
-    char *user     = NULL;
-
     char  *keywords[6];
     char  *values  [6];
     size_t i = 0;
@@ -909,7 +870,7 @@ Database___init__(Database *self, PyObject *args, PyDictObject *kwargs)
 
     if (PyTuple_GET_SIZE(args) != 0) {
         PyErr_Format(PyExc_TypeError, "'%s' takes no positional arguments, got: %R", Py_TYPE(self)->tp_name, args);
-        goto bail;
+        return -1;
     }
 
     if (kwargs != NULL) {
@@ -919,75 +880,65 @@ Database___init__(Database *self, PyObject *args, PyDictObject *kwargs)
         if (o != NULL) {
             if (!PyUnicode_Check(o)) {
                 PyErr_Format(PyExc_TypeError, "expecting string, got: %s=%R", id_host.ascii, o);
-                goto bail;
+                return -1;
             }
 
-            if ((host = encode((PyUnicodeObject *)o)) == NULL)
-                goto bail;
+            if ((values[i] = PyUnicode_AsUTF8AndSize(o, NULL)) == NULL)
+                return -1;
 
-            keywords[i] = (char *)id_host.ascii;
-            values  [i] = host;
-            i++;
+            keywords[i++] = (char *)id_host.ascii;
         }
 
         o = id_name.get(kwargs);
         if (o != NULL) {
             if (!PyUnicode_Check(o)) {
                 PyErr_Format(PyExc_TypeError, "expecting string, got: %s=%R", id_name.ascii, o);
-                goto bail;
+                return -1;
             }
 
-            if ((name = encode((PyUnicodeObject *)o)) == NULL)
-                goto bail;
+            if ((values[i] = PyUnicode_AsUTF8AndSize(o, NULL)) == NULL)
+                return -1;
 
-            keywords[i] = (char *)id_dbname.ascii;
-            values  [i] = name;
-            i++;
+            keywords[i++] = (char *)id_dbname.ascii;
         }
 
         o = id_password.get(kwargs);
         if (o != NULL) {
             if (!PyUnicode_Check(o)) {
                 PyErr_Format(PyExc_TypeError, "expecting string, got: %s=%R", id_password.ascii, o);
-                goto bail;
+                return -1;
             }
 
-            if ((password = encode((PyUnicodeObject *)o)) == NULL)
-                goto bail;
+            if ((values[i] = PyUnicode_AsUTF8AndSize(o, NULL)) == NULL)
+                return -1;
 
-            keywords[i] = (char *)id_password.ascii;
-            values  [i] = password;
-            i++;
+            keywords[i++] = (char *)id_password.ascii;
         }
 
         o = id_port.get(kwargs);
         if (o != NULL) {
             if (!PyLong_Check(o)) {
                 PyErr_Format(PyExc_TypeError, "expecting integer, got: %s=%R", id_port.ascii, o);
-                goto bail;
+                return -1;
             }
 
-            if ((port = encode((PyLongObject *)o)) == NULL)
-                goto bail;
+            TODO();
+            return -1;
 
-            keywords[i] = (char *)id_port.ascii;
-            values  [i] = port;
-            i++;
+            keywords[i++] = (char *)id_port.ascii;
         }
 
         o = id_user.get(kwargs);
         if (o != NULL) {
             if (!PyUnicode_Check(o)) {
                 PyErr_Format(PyExc_TypeError, "expecting string, got: %s=%R", id_user.ascii, o);
-                goto bail;
+                return -1;
             }
 
-            if ((user = encode((PyUnicodeObject *)o)) == NULL)
-                goto bail;
+            if ((values[i] = PyUnicode_AsUTF8AndSize(o, NULL)) == NULL)
+                return -1;
 
-            keywords[i] = (char *)id_user.ascii;
-            values  [i] = user;
-            i++;
+            keywords[i++] = (char *)id_user.ascii;
         }
     }
 
@@ -998,7 +949,7 @@ Database___init__(Database *self, PyObject *args, PyDictObject *kwargs)
 
     if (PQstatus(pg_conn) != CONNECTION_OK) {
         ConnectionError_set(pg_conn);
-        goto bail;
+        return -1;
     }
 
     // Re-initialized?
@@ -1008,16 +959,7 @@ Database___init__(Database *self, PyObject *args, PyDictObject *kwargs)
 
     self->pg_conn = pg_conn;
 
-    retval = 0;
-
-  bail:
-    PyMem_FREE(host);
-    PyMem_FREE(name);
-    PyMem_FREE(password);
-    PyMem_FREE(port);
-    PyMem_FREE(user);
-
-    return retval;
+    return 0;
 }
 
 static void

@@ -195,6 +195,27 @@ class DatabaseTests(unittest.TestCase):
 
             db('DELETE FROM test_int8_negative')
 
+    def test_transaction(self):
+        db = Database(name=NAME)
+        db('CREATE TABLE test_transaction ('
+           ' x text'
+           ');')
+
+        db('INSERT INTO test_transaction VALUES ($1)', 'before')
+
+        try:
+            with db.transaction():
+                db('INSERT INTO test_transaction VALUES ($1)', 'during')
+
+                self.assertEqual(len(db('SELECT * FROM test_transaction')), 2)
+
+                asdf
+
+        except NameError:
+            pass
+
+        self.assertEqual(len(db('SELECT * FROM test_transaction')), 1)
+
     @unittest.expectedFailure
     def test_row_equal(self):
         db = Database(name=NAME)

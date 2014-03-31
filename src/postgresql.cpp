@@ -730,6 +730,14 @@ Transaction___del__(Transaction *self)
 static Transaction *
 Transaction___enter__(Transaction *self)
 {
+    PGresult *pg_result = PQexec(self->database->pg_conn, "BEGIN");
+
+    if (PQresultStatus(pg_result) != PGRES_COMMAND_OK) {
+        ExecutionError_set(pg_result);
+        return NULL;
+    }
+
+    PQclear(pg_result);
     Py_INCREF(self);
     return self;
 }
@@ -737,8 +745,19 @@ Transaction___enter__(Transaction *self)
 static PyObject *
 Transaction___exit__(Transaction *self, PyObject *args)
 {
-    TODO();
-    return NULL;
+    if (PyTuple_GET_SIZE(args) == 3) { // Sanity
+        PGresult *pg_result = PQexec(self->database->pg_conn,
+                                     PyTuple_GET_ITEM(args, 0) == Py_None ? "COMMIT" : "ROLLBACK");
+
+        if (PQresultStatus(pg_result) != PGRES_COMMAND_OK) {
+            ExecutionError_set(pg_result);
+            return NULL;
+        }
+
+        PQclear(pg_result);
+    }
+
+    Py_RETURN_NONE;
 }
 
 static PyMethodDef
@@ -1114,7 +1133,6 @@ _Database_execute_n(Database *self, PyObject *args, size_t arity)
 {
     TODO();
     return NULL;
-//    return PQexecParams(self->pg_conn, command_bytes, 1, NULL, NULL, NULL, NULL, 1);
 }
 
 static Result *

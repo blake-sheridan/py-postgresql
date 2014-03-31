@@ -2,9 +2,9 @@
 #define POSTGRESQL_TYPE_HPP_
 
 #include "Python.h"
-#include <netinet/in.h> // htonl
-
 #include "libpq-fe.h"
+
+#include "postgresql/network.hpp"
 
 namespace postgresql {
 
@@ -97,7 +97,7 @@ class INT2
     decode(PGresult *r, int i, int j)
     {
         char   *bytes = PQgetvalue(r, i, j);
-        int16_t value = ntohs(*(int16_t *)bytes);
+        int16_t value = postgresql::network::order(*(int16_t *)bytes);
 
         return PyLong_FromLong(value);
     }
@@ -113,7 +113,7 @@ class INT4
     decode(PGresult *r, int i, int j)
     {
         char   *bytes = PQgetvalue(r, i, j);
-        int32_t value = ntohl(*(int32_t *)bytes);
+        int32_t value = postgresql::network::order(*(int32_t *)bytes);
 
         return PyLong_FromLong(value);
     }
@@ -134,8 +134,10 @@ class INT8
     static inline PyObject *
     decode(PGresult *r, int i, int j)
     {
-        TODO();
-        return NULL;
+        char   *bytes = PQgetvalue(r, i, j);
+        int64_t value = postgresql::network::order(*(int64_t *)bytes);
+
+        return PyLong_FromLongLong((int64_t)value);
     }
 };
 

@@ -30,7 +30,7 @@ class DatabaseTests(unittest.TestCase):
     def test_call_text(self):
         db = Database(name=NAME)
         db('CREATE TABLE season ('
-           ' name TEXT PRIMARY KEY'
+           ' name TEXT'
            ');')
 
         db('INSERT INTO season VALUES (\'Spring\')')
@@ -49,7 +49,7 @@ class DatabaseTests(unittest.TestCase):
     def test_integer_and_bool(self):
         db = Database(name=NAME)
         db('CREATE TABLE numbers ('
-           ' value INTEGER PRIMARY KEY,'
+           ' value INTEGER,'
            ' prime BOOL'
            ');')
 
@@ -157,7 +157,6 @@ class DatabaseTests(unittest.TestCase):
 
             db('DELETE FROM encode_int4_negative')
 
-    @unittest.expectedFailure
     def test_encode_int8_positive(self):
         db = Database(name=NAME)
         db('CREATE TABLE encode_int8_positive ('
@@ -177,7 +176,6 @@ class DatabaseTests(unittest.TestCase):
 
             db('DELETE FROM encode_int8_positive')
 
-    @unittest.expectedFailure
     def test_encode_int8_negative(self):
         db = Database(name=NAME)
         db('CREATE TABLE encode_int8_negative ('

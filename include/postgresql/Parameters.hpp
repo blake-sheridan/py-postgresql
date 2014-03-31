@@ -2,10 +2,10 @@
 #define POSTGRESQL_PARAMETERS_HPP_
 
 #include "Python.h"
-#include <netinet/in.h> // ntohs
 
 #include "libpq-fe.h"
 
+#include "postgresql/network.hpp"
 #include "postgresql/type.hpp"
 
 namespace postgresql {
@@ -56,8 +56,6 @@ class Parameters
     inline bool
     set(size_t i, int16_t x)
     {
-        x = htons(x);
-
         char *data = &this->scratch[i * BYTES_PER];
 
         this->types  [i] = INT2::OID;
@@ -65,7 +63,7 @@ class Parameters
         this->lengths[i] = 2;
         this->formats[i] = 1;
 
-        *(int16_t *)data = x;
+        *(int16_t *)data = postgresql::network::order(x);
 
         return true;
     }
@@ -73,8 +71,6 @@ class Parameters
     inline bool
     set(size_t i, int32_t x)
     {
-        x = htonl(x);
-
         char *data = &this->scratch[i * BYTES_PER];
 
         this->types  [i] = INT4::OID;
@@ -82,7 +78,7 @@ class Parameters
         this->lengths[i] = 4;
         this->formats[i] = 1;
 
-        *(int32_t *)data = x;
+        *(int32_t *)data = postgresql::network::order(x);
 
         return true;
     }
@@ -90,8 +86,16 @@ class Parameters
     inline bool
     set(size_t i, int64_t x)
     {
-        TODO();
-        return false;
+        char *data = &this->scratch[i * BYTES_PER];
+
+        this->types  [i] = INT8::OID;
+        this->values [i] = data;
+        this->lengths[i] = 8;
+        this->formats[i] = 1;
+
+        *(int64_t *)data = postgresql::network::order(x);
+
+        return true;
     }
 
     inline bool
@@ -141,31 +145,21 @@ class Parameters
         if (negative)
             size = -size;
 
-        digit *digit_next = x->ob_digit;
-        digit *digit_end  = digit_next + size;
+        uint64_t total = 0;
 
-        int64_t prev;
-        int64_t total = *digit_next++;
-
-        while (digit_next != digit_end) {
-            prev = total;
-            total = (total << PyLong_SHIFT) | *digit_next++;
-            if ((total >> PyLong_SHIFT) != prev) {
-                PyErr_Format(PyExc_ValueError, "Parameter %zd caused overflow of unsigned long", i);
-                return false;
-            }
-        }
+        while (--size >= 0)
+            total = (total << PyLong_SHIFT) | x->ob_digit[size];
 
         if (negative) {
             if (total <= 2147483648)
                 return this->set(i, -(int32_t)total);
             else
-                return this->set(i, -total);
+                return this->set(i, -(int64_t)total);
         } else {
             if (total < 2147483648)
                 return this->set(i, (int32_t)total);
             else
-                return this->set(i, total);
+                return this->set(i, (int64_t)total);
         }
     }
 

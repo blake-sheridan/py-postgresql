@@ -82,33 +82,33 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(result[5][0], 7)
         self.assertIs(   result[5][1], True)
 
-    def test_encode_text(self):
+    def test_text(self):
         db = Database(name=NAME)
-        db('CREATE TABLE encode_text ('
+        db('CREATE TABLE test_text ('
            ' x TEXT'
            ');')
 
         STRINGS = ('abc', '123')
 
         for string in STRINGS:
-            db('INSERT INTO encode_text VALUES ($1)', string)
+            db('INSERT INTO test_text VALUES ($1)', string)
 
-        result = db('SELECT * FROM encode_text')
+        result = db('SELECT * FROM test_text')
 
         self.assertEqual(len(result), len(STRINGS))
 
         for row in result:
             self.assertIn(row[0], STRINGS)
 
-    def test_encode_int2(self):
+    def test_int2(self):
         db = Database(name=NAME)
-        db('CREATE TABLE encode_int2 ('
+        db('CREATE TABLE test_int2 ('
            ' x INT2'
            ');')
 
         for x in (1, 0, -1):
-            db('INSERT INTO encode_int2 VALUES ($1)', x)
-            result = db('SELECT * FROM encode_int2')
+            db('INSERT INTO test_int2 VALUES ($1)', x)
+            result = db('SELECT * FROM test_int2')
 
             self.assertEqual(len(result), 1)
 
@@ -117,17 +117,17 @@ class DatabaseTests(unittest.TestCase):
             self.assertIsInstance(y, int)
             self.assertEqual(x, y)
 
-            db('DELETE FROM encode_int2')
+            db('DELETE FROM test_int2')
 
-    def test_encode_int4_positive(self):
+    def test_int4_positive(self):
         db = Database(name=NAME)
-        db('CREATE TABLE encode_int4_positive ('
+        db('CREATE TABLE test_int4_positive ('
            ' x INT4'
            ');')
 
         for x in (2**17, 2**22):
-            db('INSERT INTO encode_int4_positive VALUES ($1)', x)
-            result = db('SELECT * FROM encode_int4_positive')
+            db('INSERT INTO test_int4_positive VALUES ($1)', x)
+            result = db('SELECT * FROM test_int4_positive')
 
             self.assertEqual(len(result), 1)
 
@@ -136,17 +136,17 @@ class DatabaseTests(unittest.TestCase):
             self.assertIsInstance(y, int)
             self.assertEqual(x, y)
 
-            db('DELETE FROM encode_int4_positive')
+            db('DELETE FROM test_int4_positive')
 
-    def test_encode_int4_negative(self):
+    def test_int4_negative(self):
         db = Database(name=NAME)
-        db('CREATE TABLE encode_int4_negative ('
+        db('CREATE TABLE test_int4_negative ('
            ' x INT4'
            ');')
 
         for x in (-2**17, -2**22):
-            db('INSERT INTO encode_int4_negative VALUES ($1)', x)
-            result = db('SELECT * FROM encode_int4_negative')
+            db('INSERT INTO test_int4_negative VALUES ($1)', x)
+            result = db('SELECT * FROM test_int4_negative')
 
             self.assertEqual(len(result), 1)
 
@@ -155,17 +155,17 @@ class DatabaseTests(unittest.TestCase):
             self.assertIsInstance(y, int)
             self.assertEqual(x, y)
 
-            db('DELETE FROM encode_int4_negative')
+            db('DELETE FROM test_int4_negative')
 
-    def test_encode_int8_positive(self):
+    def test_int8_positive(self):
         db = Database(name=NAME)
-        db('CREATE TABLE encode_int8_positive ('
+        db('CREATE TABLE test_int8_positive ('
            ' x INT8'
            ');')
 
         for x in (2**42, 2**50):
-            db('INSERT INTO encode_int8_positive VALUES ($1)', x)
-            result = db('SELECT * FROM encode_int8_positive')
+            db('INSERT INTO test_int8_positive VALUES ($1)', x)
+            result = db('SELECT * FROM test_int8_positive')
 
             self.assertEqual(len(result), 1)
 
@@ -174,17 +174,17 @@ class DatabaseTests(unittest.TestCase):
             self.assertIsInstance(y, int)
             self.assertEqual(x, y)
 
-            db('DELETE FROM encode_int8_positive')
+            db('DELETE FROM test_int8_positive')
 
-    def test_encode_int8_negative(self):
+    def test_int8_negative(self):
         db = Database(name=NAME)
-        db('CREATE TABLE encode_int8_negative ('
+        db('CREATE TABLE test_int8_negative ('
            ' x INT8'
            ');')
 
         for x in (-2**42, -2**50):
-            db('INSERT INTO encode_int8_negative VALUES ($1)', x)
-            result = db('SELECT * FROM encode_int8_negative')
+            db('INSERT INTO test_int8_negative VALUES ($1)', x)
+            result = db('SELECT * FROM test_int8_negative')
 
             self.assertEqual(len(result), 1)
 
@@ -193,7 +193,7 @@ class DatabaseTests(unittest.TestCase):
             self.assertIsInstance(y, int)
             self.assertEqual(x, y)
 
-            db('DELETE FROM encode_int8_negative')
+            db('DELETE FROM test_int8_negative')
 
     @unittest.expectedFailure
     def test_row_equal(self):

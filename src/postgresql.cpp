@@ -4,7 +4,7 @@
 #include "b/Identifier.hpp"
 #include "b/python.h"
 #include "b/type.hpp"
-#include "postgresql/Parameters.hpp"
+#include "postgresql/parameters.hpp"
 #include "postgresql/type.hpp"
 
 typedef struct {
@@ -1128,13 +1128,6 @@ Database_methods[] = {
     {NULL}
 };
 
-static inline Result *
-_Database_execute_n(Database *self, PyObject *args, size_t arity)
-{
-    TODO();
-    return NULL;
-}
-
 static Result *
 Database___call__(Database *self, PyObject *args, PyObject *kwargs)
 {
@@ -1143,33 +1136,75 @@ Database___call__(Database *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    PGresult *pg_result;
-
     Py_ssize_t n = PyTuple_GET_SIZE(args);
-    switch (n) {
-      case 0:
-          PyErr_SetString(PyExc_TypeError, "expecting at least 1 positional argument");
-          return NULL;
+    if (n == 0) {
+        PyErr_SetString(PyExc_TypeError, "expecting at least 1 positional argument");
+        return NULL;
+    }
 
-      case 1: {
-          postgresql::Parameters<0> parameters;
+    PyObject *o = PyTuple_GET_ITEM(args, 0);
+    if (!PyUnicode_Check(o)) {
+        PyErr_Format(PyExc_TypeError, "command must be a string, got: %R", o);
+        return NULL;
+    }
 
-          pg_result = parameters.execute(self->pg_conn, PyTuple_GET_ITEM(args, 0));
-      }
-          break;
+    if (PyUnicode_READY(o) == -1)
+        return NULL;
 
-      case 2: {
-          postgresql::Parameters<1> parameters;
+    char *command;
+    if (PyUnicode_IS_COMPACT_ASCII(o)) {
+        // Inline fast path for ASCII strings
+        command = (char *)((PyASCIIObject *)o + 1);
+    } else {
+        TODO();
+        return NULL;
+    }
 
-          if (!parameters.set(0, PyTuple_GET_ITEM(args, 1)))
+    PGresult *pg_result;
+    if (n == 1) {
+        pg_result = PQexecParams(
+            self->pg_conn,
+            command,
+            0,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            1);
+
+    } else if (n == 2) {
+        postgresql::parameters::Static<1> p1;
+
+        if (!p1.append(PyTuple_GET_ITEM(args, 1)))
               return NULL;
 
-          pg_result = parameters.execute(self->pg_conn, PyTuple_GET_ITEM(args, 0));
-      }
-          break;
-      default:
-          TODO();
-          return NULL;
+        pg_result = PQexecParams(
+            self->pg_conn,
+            command,
+            1,
+            p1.types,
+            p1.values,
+            p1.lengths,
+            p1.formats,
+            1);
+
+    } else {
+        postgresql::parameters::Dynamic pn(n - 1);
+
+        for (Py_ssize_t i = 1; i < n; i++) {
+            if (!pn.append(PyTuple_GET_ITEM(args, i)))
+                return NULL;
+        }
+
+        pg_result = PQexecParams(
+            self->pg_conn,
+            command,
+            n - 1,
+            pn.types,
+            pn.values,
+            pn.lengths,
+            pn.formats,
+            1);
     }
 
     if (pg_result == NULL)

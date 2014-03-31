@@ -216,6 +216,29 @@ class DatabaseTests(unittest.TestCase):
 
         self.assertEqual(len(db('SELECT * FROM test_transaction')), 1)
 
+    def test_parameters_n(self):
+        db = Database(name=NAME)
+        db('CREATE TABLE test_parameters_n ('
+           ' a text,'
+           ' b text,'
+           ' c text,'
+           ' d text'
+           ');')
+
+        db('INSERT INTO test_parameters_n VALUES ($1,$2,$3,$4)',
+           'a', 's', 'd', 'f')
+
+        result = db('SELECT * FROM test_parameters_n')
+
+        self.assertEqual(len(result), 1)
+
+        row = result[0]
+
+        self.assertEqual(row[0], 'a')
+        self.assertEqual(row[1], 's')
+        self.assertEqual(row[2], 'd')
+        self.assertEqual(row[3], 'f')
+
     @unittest.expectedFailure
     def test_row_equal(self):
         db = Database(name=NAME)

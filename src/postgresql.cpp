@@ -4,6 +4,7 @@
 #include "b/Identifier.hpp"
 #include "b/python.h"
 #include "b/type.hpp"
+#include "postgresql/Parameters.hpp"
 #include "postgresql/type.hpp"
 
 typedef struct {
@@ -340,7 +341,7 @@ Row___len__(Row *self)
 static PyObject *
 Row___getitem__(Row *self, Py_ssize_t index)
 {
-    return postgresql::type::decode(self->result->pg_result, self->index, index);
+    return postgresql::decode(self->result->pg_result, self->index, index);
 }
 
 static PyObject *
@@ -1108,58 +1109,6 @@ Database_methods[] = {
     {NULL}
 };
 
-static inline char *
-encoded_command(PyObject *command)
-{
-    if (!PyUnicode_Check(command)) {
-        PyErr_Format(PyExc_TypeError, "command must be a string, got: %R", command);
-        return NULL;
-    }
-
-    if (PyUnicode_READY(command) == -1)
-        return NULL;
-
-    if (PyUnicode_IS_COMPACT_ASCII(command)) {
-        // Inline fast path for ASCII strings
-        return (char *)((PyASCIIObject *)command + 1);
-    }
-
-    TODO();
-    return NULL;
-}
-
-static inline Result *
-_Database_execute_0(Database *self, PyObject *command_object)
-{
-    char *command = encoded_command(command_object);
-    if (command == NULL)
-        return NULL;
-
-    return Result_new(
-        PQexecParams(self->pg_conn, command, 0, NULL, NULL, NULL, NULL, 1)
-        );
-}
-
-static inline Result *
-_Database_execute_1(Database *self, PyObject *command_object, PyObject *parameter)
-{
-    char *command = encoded_command(command_object);
-    if (command == NULL)
-        return NULL;
-
-    Oid   types[1];
-    char *values[1];
-    int   lengths[1];
-    int   formats[1];
-
-    if (!postgresql::type::encode(parameter, types, values, lengths, formats))
-        return NULL;
-
-    return Result_new(
-        PQexecParams(self->pg_conn, command, 1, types, values, lengths, formats, 1)
-        );
-}
-
 static inline Result *
 _Database_execute_n(Database *self, PyObject *args, size_t arity)
 {
@@ -1176,18 +1125,39 @@ Database___call__(Database *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+    PGresult *pg_result;
+
     Py_ssize_t n = PyTuple_GET_SIZE(args);
     switch (n) {
       case 0:
           PyErr_SetString(PyExc_TypeError, "expecting at least 1 positional argument");
           return NULL;
-      case 1:
-          return _Database_execute_0(self, PyTuple_GET_ITEM(args, 0));
-      case 2:
-          return _Database_execute_1(self, PyTuple_GET_ITEM(args, 0), PyTuple_GET_ITEM(args, 1));
+
+      case 1: {
+          postgresql::Parameters<0> parameters;
+
+          pg_result = parameters.execute(self->pg_conn, PyTuple_GET_ITEM(args, 0));
+      }
+          break;
+
+      case 2: {
+          postgresql::Parameters<1> parameters;
+
+          if (!parameters.set(0, PyTuple_GET_ITEM(args, 1)))
+              return NULL;
+
+          pg_result = parameters.execute(self->pg_conn, PyTuple_GET_ITEM(args, 0));
+      }
+          break;
       default:
-          return _Database_execute_n(self, args, n - 1);
+          TODO();
+          return NULL;
     }
+
+    if (pg_result == NULL)
+        return NULL;
+
+    return Result_new(pg_result);
 }
 
 /* Database_type */

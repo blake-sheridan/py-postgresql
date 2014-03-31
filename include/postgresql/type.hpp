@@ -7,7 +7,6 @@
 #include "libpq-fe.h"
 
 namespace postgresql {
-namespace type {
 
 class BOOL
 {
@@ -22,13 +21,6 @@ class BOOL
         else
             Py_RETURN_FALSE;
     }
-
-    static inline bool
-    encode(PyObject *o, Oid *types, char **values, int *lengths, int *formats)
-    {
-        TODO();
-        return NULL;
-    }
 };
 
 class BYTEA
@@ -38,13 +30,6 @@ class BYTEA
 
     static inline PyObject *
     decode(PGresult *r, int i, int j)
-    {
-        TODO();
-        return NULL;
-    }
-
-    static inline bool
-    encode(PyObject *o, Oid *types, char **values, int *lengths, int *formats)
     {
         TODO();
         return NULL;
@@ -111,28 +96,10 @@ class INT2
     static inline PyObject *
     decode(PGresult *r, int i, int j)
     {
-        TODO();
-        return NULL;
-    }
+        char   *bytes = PQgetvalue(r, i, j);
+        int16_t value = ntohs(*(int16_t *)bytes);
 
-    static inline bool
-    encode(short x, Oid *types, char **values, int *lengths, int *formats)
-    {
-        TODO();
-        return NULL;
-    }
-
-    static inline bool
-    encode_0(Oid *types, char **values, int *lengths, int *formats)
-    {
-        static const char * const ZERO = "00";
-
-        *types   = INT2::OID;
-        *values  = (char *)ZERO; // The libpq is const
-        *lengths = 2;
-        *formats = 1;
-
-        return true;
+        return PyLong_FromLong(value);
     }
 };
 
@@ -145,9 +112,8 @@ class INT4
     static inline PyObject *
     decode(PGresult *r, int i, int j)
     {
-        char   *bytes      = PQgetvalue(r, i, j);
-        int32_t host_value = *(int32_t *)bytes;
-        int32_t value      = htonl(host_value);
+        char   *bytes = PQgetvalue(r, i, j);
+        int32_t value = ntohl(*(int32_t *)bytes);
 
         return PyLong_FromLong(value);
     }
@@ -172,22 +138,6 @@ class INT8
         return NULL;
     }
 };
-
-static inline bool
-encode(PyLongObject *x, Oid *types, char **values, int *lengths, int *formats)
-{
-    // Implementation details
-    Py_ssize_t size = Py_SIZE(x);
-
-    switch (size) {
-      case  1: return INT2::encode(  (short)(x->ob_digit[0]), types, values, lengths, formats);
-      case  0: return INT2::encode_0(                         types, values, lengths, formats);
-      case -1: return INT2::encode( -(short)(x->ob_digit[0]), types, values, lengths, formats);
-    }
-
-    TODO();
-    return NULL;
-}
 
 class INTERVAL
 {
@@ -235,23 +185,6 @@ class TEXT
     {
         TODO();
         return NULL;
-    }
-
-    static inline bool
-    encode(PyObject *o, Oid *types, char **values, int *lengths, int *formats)
-    {
-        Py_ssize_t size;
-
-        char *utf8 = PyUnicode_AsUTF8AndSize(o, &size);
-        if (utf8 == NULL)
-            return false;
-
-        *types   = TEXT::OID;
-        *values  = utf8;
-        *lengths = size;
-        *formats = 1;
-
-        return true;
     }
 };
 
@@ -349,36 +282,6 @@ decode(PGresult *r, int i, int j)
     return NULL;
 }
 
-static inline bool
-encode(PyObject *x, Oid *types, char **values, int *lengths, int *formats)
-{
-    PyTypeObject *cls = Py_TYPE(x);
-
-    // Priority to builtin exact types
-    if (cls == &PyUnicode_Type)
-        return TEXT::encode(x, types, values, lengths, formats);
-
-    if (cls == &PyLong_Type)
-        return encode((PyLongObject *)x, types, values, lengths, formats);
-
-    if (cls == &PyFloat_Type) {
-        TODO();
-        return NULL;
-    }
-
-    if (cls == &PyBool_Type) {
-        return BOOL::encode(x, types, values, lengths, formats);
-    }
-
-    if (cls == &PyBytes_Type) {
-        return BYTEA::encode(x, types, values, lengths, formats);
-    }
-
-    PyErr_Format(PyExc_NotImplementedError, "encode(%R)", x);
-    return NULL;
-}
-
-} // namespace type
 } // namespace postgresql
 
 #endif

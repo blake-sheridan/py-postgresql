@@ -10,7 +10,11 @@ setup(
         Extension(
             name = 'postgresql',
             depends = [
+                'include/postgresql/Parameters.hpp',
                 'include/postgresql/type.hpp',
+            ],
+            extra_compile_args = [
+                '-std=c++0x',
             ],
             include_dirs = [
                 '/usr/include/postgresql',
